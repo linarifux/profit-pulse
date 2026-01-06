@@ -1,9 +1,5 @@
 import dotenv from "dotenv";
 import connectDB from "./db/index.js";
-
-dotenv.config();
-
-
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -15,6 +11,7 @@ import integrationRouter from "./routes/integration.routes.js";
 import transactionRouter from "./routes/transaction.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
 
+dotenv.config();
 
 const app = express();
 
@@ -30,7 +27,8 @@ connectDB()
 
 // Configuration for incoming data
 app.use(cors({
-    origin: 'https://profit-pulse-chi.vercel.app' || "http://localhost:5173", // Must match frontend URL exactly
+    // Use an array to allow both Production (Netlify) and Development (Localhost)
+    origin: ["https://profit-pulse1.netlify.app", "http://localhost:5173", "https://profit-pulse-chi.vercel.app"],
     credentials: true // Crucial for cookies to work
 }));
 
@@ -52,4 +50,3 @@ app.use("/api/v1/dashboard", dashboardRouter);
 app.use("/api/v1/integrations", integrationRouter); 
 app.use("/api/v1/transactions", transactionRouter);
 app.use("/api/v1/analytics", analyticsRouter);
-
