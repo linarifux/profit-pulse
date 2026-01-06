@@ -30,7 +30,7 @@ connectDB()
 
 // Configuration for incoming data
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173", // Must match frontend URL exactly
+    origin: 'https://profit-pulse-chi.vercel.app' || "http://localhost:5173", // Must match frontend URL exactly
     credentials: true // Crucial for cookies to work
 }));
 
