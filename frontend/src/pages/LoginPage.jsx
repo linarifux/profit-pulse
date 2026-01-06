@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { login, reset } from '../features/auth/authSlice';
 import { Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast'; // Import toast
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({
@@ -21,17 +22,15 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (isError) {
-      // You could use a toast notification here
-      console.error(message);
+      toast.error(message || "Login failed"); // Trigger Error Toast
     }
 
     if (isSuccess || user) {
+      toast.success("Welcome back!"); // Trigger Success Toast
       navigate('/');
     }
 
-    return () => {
-      dispatch(reset());
-    };
+    dispatch(reset());
   }, [user, isError, isSuccess, message, navigate, dispatch]);
 
   const onChange = (e) => {
@@ -72,11 +71,6 @@ const LoginPage = () => {
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={onSubmit}>
-            {isError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-red-400 text-sm">
-                    {message}
-                </div>
-            )}
             
             <div className="space-y-4">
               <div>
