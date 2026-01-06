@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-dark-bg: #0f172a;       /* Slate 900 */
+  --color-card-bg: #1e293b;       /* Slate 800 */
+  --color-accent: #3b82f6;        /* Blue 500 */
+  --color-accent-glow: #3b82f680; /* Blue 500 with opacity */
+  
+  --font-display: "Inter", sans-serif;
+}
+
+/* Global Reset for Dark Mode */
+body {
+  background-color: var(--color-dark-bg);
+  color: #ffffff;
+  font-family: var(--font-display);
+}
