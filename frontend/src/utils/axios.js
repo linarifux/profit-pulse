@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create an instance with default config
 const api = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000/api/v1', // Your Backend URL
+  baseURL: import.meta.env.VITE_BACKEND_URL, // Your Backend URL
   withCredentials: true, // Crucial! Allows cookies (RefreshToken) to be sent/received
   headers: {
     'Content-Type': 'application/json',
