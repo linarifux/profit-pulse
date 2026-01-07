@@ -5,6 +5,7 @@ import Sidebar from '../components/layout/Sidebar';
 import IntegrationCard from '../components/integrations/IntegrationCard';
 import integrationService from '../features/integrations/integrationService';
 import { ShoppingBag, Facebook, Video, BarChart, Loader2, Menu } from 'lucide-react';
+import toast from 'react-hot-toast'; // Ensure react-hot-toast is installed
 
 const IntegrationsPage = () => {
   const navigate = useNavigate();
@@ -39,13 +40,48 @@ const IntegrationsPage = () => {
   }, [user]);
 
   const handleToggle = async (key) => {
+      // --- SHOPIFY SPECIFIC LOGIC ---
+      if (key === 'shopify' && !connectedApps.shopify) {
+          // 1. Ask for Shop Name
+          const shopName = prompt("Enter your Shopify store URL (e.g., my-store.myshopify.com):");
+          if (!shopName) return;
+
+          try {
+              // 2. Get Auth URL from Backend
+              const response = await integrationService.getShopifyAuthUrl(shopName);
+              
+              // 3. Redirect User to Shopify
+              if (response.data && response.data.url) {
+                  window.location.href = response.data.url;
+              } else {
+                  toast.error("Invalid response from server");
+              }
+          } catch (error) {
+              console.error(error);
+              toast.error("Could not initiate Shopify connection");
+          }
+          return; // Stop here, don't execute the standard toggle below
+      }
+      // -------------------------------
+
+      // Standard Toggle Logic for other apps (or disconnecting)
       try {
           const previousState = connectedApps[key];
           setConnectedApps(prev => ({ ...prev, [key]: !previousState }));
-          await integrationService.toggleIntegration(key);
+          
+          if (key === 'shopify' && connectedApps.shopify) {
+             // Handle disconnect specifically if needed, otherwise standard toggle
+             // For shopify disconnect, you might want a specific API call if standard toggle isn't enough
+             await integrationService.toggleIntegration(key); // Or specific disconnect service
+          } else {
+             await integrationService.toggleIntegration(key);
+          }
+          
       } catch (error) {
           console.error("Failed to toggle connection", error);
+          // Revert on error
           setConnectedApps(prev => ({ ...prev, [key]: !prev[key] }));
+          toast.error("Failed to update connection");
       }
   };
 
