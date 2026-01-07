@@ -1,7 +1,8 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast'; // Import Toaster
+import { Toaster } from 'react-hot-toast';
 import ScrollToTop from './components/layout/ScrollToTop';
+import ProtectedRoute from './components/layout/ProtectedRoute'; // Import
 
 // Pages
 import DashboardPage from './pages/DashboardPage';
@@ -15,8 +16,7 @@ function App() {
   return (
     <>
       <ScrollToTop />
-      {/* Global Toaster Configuration */}
-      <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           style: {
@@ -38,14 +38,41 @@ function App() {
           },
         }}
       />
-      
+
       <Routes>
+        {/* Public Route */}
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/integrations" element={<IntegrationsPage />} />
-        <Route path="/finances" element={<FinancesPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+
+        {/* Protected Routes */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/integrations" element={
+          <ProtectedRoute>
+            <IntegrationsPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/finances" element={
+          <ProtectedRoute>
+            <FinancesPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/analytics" element={
+          <ProtectedRoute>
+            <AnalyticsPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        } />
       </Routes>
     </>
   );

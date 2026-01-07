@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Sidebar from '../components/layout/Sidebar';
 import authService from '../features/auth/authService';
-import { User, Lock, Save, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { User, Lock, Save, Loader2, CheckCircle, AlertCircle, Menu } from 'lucide-react';
 
 const SettingsPage = () => {
+  const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // State for Profile Form
   const [profileData, setProfileData] = useState({
@@ -23,6 +26,13 @@ const SettingsPage = () => {
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+
+  // 1. Protect Route
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
   // -- Handlers --
 
@@ -63,17 +73,50 @@ const SettingsPage = () => {
     }
   };
 
+  if (!user) return null;
+
   return (
-    <div className="flex min-h-screen bg-dark-bg text-white">
-      <Sidebar />
+    <div className="flex min-h-screen bg-dark-bg text-white relative">
       
-      <main className="flex-1 ml-64 p-8">
-        <header className="mb-8">
-            <h1 className="text-2xl font-bold">Settings</h1>
-            <p className="text-slate-400 text-sm">Manage your account preferences and security.</p>
+      {/* 1. Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
+
+      {/* 2. Desktop Fixed Sidebar */}
+      <div className="hidden md:block fixed inset-y-0 left-0 z-50 w-64">
+        <Sidebar />
+      </div>
+
+      {/* 3. Mobile Slide-out Sidebar */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:hidden
+      `}>
+        <Sidebar onClose={() => setSidebarOpen(false)} />
+      </div>
+      
+      {/* 4. Main Content */}
+      <main className="flex-1 w-full md:ml-64 p-4 md:p-8 space-y-6 overflow-x-hidden">
+        
+        <header className="flex items-center gap-3 mb-6 md:mb-8">
+            <button 
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden p-2 bg-slate-800 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
+            >
+                <Menu size={20} />
+            </button>
+            <div>
+                <h1 className="text-xl md:text-2xl font-bold">Settings</h1>
+                <p className="text-slate-400 text-xs md:text-sm">Manage your account preferences and security.</p>
+            </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             
             {/* 1. Profile Settings Card */}
             <div className="bg-card-bg rounded-xl border border-slate-700/50 p-6">
@@ -154,7 +197,7 @@ const SettingsPage = () => {
                             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-1">New Password</label>
                             <input 
