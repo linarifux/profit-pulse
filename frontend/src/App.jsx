@@ -11,6 +11,8 @@ import IntegrationsPage from './pages/IntegrationsPage';
 import FinancesPage from './pages/FinancesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
+import NotFoundPage from './pages/NotFoundPage';
+import SignupPage from './pages/SignupPage';
 
 function App() {
   return (
@@ -42,6 +44,7 @@ function App() {
       <Routes>
         {/* Public Route */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<SignupPage />} /> {/* Add Route */}
 
         {/* Protected Routes */}
         <Route path="/" element={
@@ -73,6 +76,8 @@ function App() {
             <SettingsPage />
           </ProtectedRoute>
         } />
+
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
   );

@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion'; // Animation library
+import toast from 'react-hot-toast'; // Toast library
 import Sidebar from '../components/layout/Sidebar';
 import MetricCard from '../components/dashboard/MetricCard';
 import dashboardService from '../features/dashboard/dashboardService';
-import { DollarSign, ShoppingBag, CreditCard, Activity, RefreshCw, Facebook, Video, Globe, TrendingUp, Zap, Target, QrCode, Smartphone, Apple, Menu } from 'lucide-react';
+import { 
+  DollarSign, ShoppingBag, CreditCard, Activity, RefreshCw, Facebook, 
+  Video, Globe, Zap, Menu, Smartphone, Apple, Calendar, ArrowUpRight,
+  QrCode
+} from 'lucide-react';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell, BarChart 
@@ -15,30 +21,70 @@ const DashboardPage = () => {
   const { user } = useSelector((state) => state.auth);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [timeframe, setTimeframe] = useState('daily');
-  
-  // 1. Add State for Sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // --- Animation Variants ---
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1, delayChildren: 0.2 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+      y: 0, 
+      opacity: 1,
+      transition: { type: "spring", stiffness: 100 }
+    }
+  };
+
+  // --- Auth & Initial Logic ---
   useEffect(() => {
     if (!user) {
       navigate('/login');
     }
   }, [user, navigate]);
 
-  const fetchStats = async () => {
-    if (!user) return; 
+  const fetchStats = async (isRefresh = false) => {
+    if (!user) return;
+    
+    if (isRefresh) setRefreshing(true);
+    
     try {
-      setLoading(true);
-      const response = await dashboardService.getDashboardStats(timeframe);
-      setStats(response.data);
+      // If it's a manual refresh, show a promise toast
+      if (isRefresh) {
+        const promise = dashboardService.getDashboardStats(timeframe);
+        toast.promise(promise, {
+          loading: 'Syncing latest data...',
+          success: 'Dashboard updated!',
+          error: 'Could not sync data.'
+        }, {
+           style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' }
+        });
+        const response = await promise;
+        setStats(response.data);
+      } else {
+        // Initial load
+        setLoading(true);
+        const response = await dashboardService.getDashboardStats(timeframe);
+        setStats(response.data);
+      }
     } catch (err) {
       console.error(err);
       if (err.response && err.response.status === 401) {
-          navigate('/login');
+        toast.error("Session expired. Please login again.", { id: 'session-expired' });
+        navigate('/login');
+      } else if (!isRefresh) {
+        toast.error("Failed to load dashboard data.", { id: 'fetch-error' });
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -50,254 +96,292 @@ const DashboardPage = () => {
 
   if (!user) return null;
 
-  const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+  // --- Helpers ---
+  const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
 
-  // ... (Keep existing Helper Components: ChannelIcon, CustomYAxisTick, Tooltips, SummaryRow) ...
-  // [For brevity, assuming these helper components are unchanged from previous code]
-  const ChannelIcon = ({ name }) => { const n = name.toUpperCase(); if (n === 'META' || n === 'FACEBOOK') return <div className="p-1.5 bg-blue-600 rounded-md"><Facebook size={16} className="text-white"/></div>; if (n === 'TIKTOK') return <div className="p-1.5 bg-pink-600 rounded-md"><Video size={16} className="text-white"/></div>; if (n === 'GOOGLE') return <div className="p-1.5 bg-yellow-500 rounded-md"><Globe size={16} className="text-white"/></div>; return <div className="p-1.5 bg-slate-600 rounded-md"><Globe size={16} className="text-white"/></div>; };
-  const CustomYAxisTick = ({ x, y, payload }) => ( <g transform={`translate(${x},${y})`}> <foreignObject x={-40} y={-15} width={30} height={30}> <div className="flex justify-end items-center h-full w-full"> <ChannelIcon name={payload.value} /> </div> </foreignObject> </g> );
-  const CustomTooltip = ({ active, payload, label }) => { if (active && payload && payload.length) { const revenue = payload.find(p => p.dataKey === "revenue")?.value || 0; const profit = payload.find(p => p.dataKey === "netProfit")?.value || 0; const margin = payload.find(p => p.dataKey === "margin")?.value || 0; return ( <div className="bg-slate-800 border border-slate-700 p-3 md:p-4 rounded-lg shadow-xl text-xs md:text-sm min-w-[150px] md:min-w-[200px] z-50"> <p className="text-slate-400 mb-2 border-b border-slate-700 pb-2">{label}</p> <div className="space-y-1"> <div className="flex justify-between gap-2"><span className="text-emerald-400">Rev:</span> <span className="font-bold text-white">{formatCurrency(revenue)}</span></div> <div className="flex justify-between gap-2"><span className="text-yellow-400">Profit:</span> <span className="font-bold text-white">{formatCurrency(profit)}</span></div> <div className="flex justify-between gap-2"><span className="text-orange-400">Margin:</span> <span className="font-bold text-white">{margin}%</span></div> </div> </div> ); } return null; };
-  const OrderTooltip = ({ active, payload, label }) => { if (active && payload && payload.length) { return ( <div className="bg-slate-800 border border-slate-700 p-3 rounded-lg shadow-xl text-xs md:text-sm z-50"> <p className="text-slate-400 mb-2 border-b border-slate-700 pb-1">{label}</p> <div className="space-y-1"> <div className="flex justify-between gap-4"><span className="text-slate-300">Orders:</span> <span className="font-bold text-white">{payload[0].value}</span></div> <div className="flex justify-between gap-4"><span className="text-orange-400">Ad Spend/Order:</span> <span className="font-bold text-white">{formatCurrency(payload[1].value)}</span></div> </div> </div> ); } return null; };
-  const SummaryRow = ({ label, value, color = "text-white" }) => ( <div className="flex justify-between items-center py-2 md:py-3 border-b border-slate-700/50 last:border-0"> <span className="text-slate-400 font-medium text-xs md:text-sm">{label}</span> <span className={`font-bold text-sm md:text-base ${color}`}>{value}</span> </div> );
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  // --- Custom Components ---
+  const SummaryRow = ({ label, value, color = "text-white" }) => (
+    <div className="flex justify-between items-center py-3 border-b border-slate-800/50 last:border-0 group cursor-default">
+      <span className="text-slate-400 text-sm group-hover:text-slate-300 transition-colors">{label}</span>
+      <span className={`font-bold text-sm md:text-base ${color}`}>{value}</span>
+    </div>
+  );
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 p-4 rounded-xl shadow-2xl text-xs md:text-sm min-w-[180px]">
+          <p className="text-slate-400 mb-3 pb-2 border-b border-slate-700 font-medium">{label}</p>
+          <div className="space-y-2">
+            {payload.map((entry, index) => (
+              <div key={index} className="flex justify-between items-center gap-4">
+                 <span style={{ color: entry.fill || entry.stroke }} className="capitalize">{entry.name}:</span>
+                 <span className="font-bold text-white">
+                   {entry.name === 'margin' ? `${entry.value}%` : formatCurrency(entry.value)}
+                 </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
-    <div className="flex min-h-screen bg-dark-bg text-white relative">
+    <div className="flex min-h-screen bg-[#0b1120] text-white relative font-sans selection:bg-blue-500/30">
       
-      {/* 2. Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
-      )}
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* 3. Sidebar Container */}
-      <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:translate-x-0 md:static md:block
-      `}>
+      {/* Sidebar - Desktop Sticky */}
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
+
+      {/* Sidebar - Mobile Slide-out */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-out md:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>
       
-      <main className="flex-1 w-full p-4 md:p-8 space-y-6 overflow-x-hidden">
+      {/* Main Content */}
+      <main className="flex-1 w-full p-4 md:p-8 space-y-8 overflow-x-hidden">
         
-        {/* HEADER */}
-        <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-             <div className="flex items-center gap-3">
-                {/* 4. Toggle Button */}
+        {/* HEADER SECTION */}
+        <motion.header 
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="flex flex-col md:flex-row md:justify-between md:items-center gap-4"
+        >
+             <div className="flex items-center gap-4">
                 <button 
                     onClick={() => setSidebarOpen(true)}
-                    className="md:hidden p-2 bg-slate-800 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
+                    className="md:hidden p-2 bg-slate-800/50 hover:bg-slate-700 rounded-xl text-slate-300 transition-colors border border-slate-700"
                 >
                     <Menu size={20} />
                 </button>
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold">Dashboard</h1>
-                    <p className="text-slate-400 text-xs md:text-sm">Real-time financial overview.</p>
+                    <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                      {getGreeting()}, {user?.fullName?.split(' ')[0] || 'User'}
+                    </h1>
+                    <p className="text-slate-400 text-sm mt-1 flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                       System operational • Real-time data
+                    </p>
                 </div>
             </div>
             
-            <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-             <div className="bg-card-bg rounded-lg border border-slate-700 p-1 flex flex-1 md:flex-none">
+            <div className="flex items-center gap-3 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800/50 backdrop-blur-sm">
+             <div className="flex">
                 {['daily', 'weekly', 'monthly'].map((t) => (
                     <button 
                         key={t} 
                         onClick={() => setTimeframe(t)} 
-                        className={`flex-1 md:flex-none px-3 py-1.5 text-xs font-medium rounded-md capitalize transition-colors ${timeframe === t ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                        className={`relative px-4 py-2 text-xs font-semibold rounded-lg capitalize transition-all duration-300 z-10 ${
+                          timeframe === t ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+                        }`}
                     >
+                        {timeframe === t && (
+                          <motion.div 
+                            layoutId="activeTimeframe"
+                            className="absolute inset-0 bg-blue-600 rounded-lg -z-10 shadow-lg shadow-blue-500/25"
+                          />
+                        )}
                         {t}
                     </button>
                 ))}
              </div>
-             <button onClick={fetchStats} className="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-slate-300 transition-colors">
-                <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+             <div className="w-px h-6 bg-slate-700 mx-1"></div>
+             <button 
+               onClick={() => fetchStats(true)} 
+               disabled={refreshing}
+               className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-all active:scale-95"
+             >
+                <RefreshCw size={18} className={refreshing ? "animate-spin text-blue-400" : ""} />
              </button>
           </div>
-        </header>
+        </motion.header>
 
-        {/* ... (Keep existing dashboard content cards below) ... */}
-        {!loading && stats && (
-            <>
+        {!loading && stats ? (
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="space-y-6"
+            >
+                {/* 1. METRIC CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                    <MetricCard title="Total Revenue" value={formatCurrency(stats.cards.totalRevenue)} change={0} isPositive={true} icon={DollarSign} />
-                    <MetricCard title="Total Ad Spend" value={formatCurrency(stats.cards.totalAdSpend)} change={0} isPositive={false} icon={CreditCard} />
+                    <MetricCard title="Total Revenue" value={formatCurrency(stats.cards.totalRevenue)} change={12.5} isPositive={true} icon={DollarSign} />
+                    <MetricCard title="Total Ad Spend" value={formatCurrency(stats.cards.totalAdSpend)} change={2.3} isPositive={false} icon={CreditCard} />
                     <MetricCard title="Net Profit" value={formatCurrency(stats.cards.netProfit)} change={stats.cards.profitMargin} isPositive={stats.cards.netProfit > 0} icon={Activity} />
-                    <MetricCard title="Total Orders" value={stats.cards.totalOrders} change={0} isPositive={true} icon={ShoppingBag} />
+                    <MetricCard title="Total Orders" value={stats.cards.totalOrders} change={5.1} isPositive={true} icon={ShoppingBag} />
                 </div>
 
-                {/* Performance Chart */}
-                <div className="bg-card-bg p-4 md:p-6 rounded-xl border border-slate-700/50">
-                    <h2 className="text-base md:text-lg font-bold mb-4 md:mb-6">Performance Overview</h2>
-                    <div className="h-[300px] md:h-[400px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={stats.graphData} margin={{ top: 10, right: 0, bottom: 0, left: -20 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                <XAxis dataKey="date" stroke="#94a3b8" tickLine={false} axisLine={false} dy={10} tick={{fontSize: 12}} tickFormatter={(str) => str.substring(5)} />
-                                <YAxis yAxisId="left" stroke="#94a3b8" tickLine={false} axisLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `$${val/1000}k`} />
-                                <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" tickLine={false} axisLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `${val}%`} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
-                                <ReferenceLine y={0} yAxisId="left" stroke="#475569" />
-                                <Bar yAxisId="left" dataKey="revenue" barSize={12} md:barSize={20} fill="#34d399" radius={[4, 4, 0, 0]} />
-                                <Bar yAxisId="left" dataKey={(data) => -data.totalCosts} name="totalCosts" barSize={12} md:barSize={20} fill="#3b82f6" radius={[0, 0, 4, 4]} opacity={0.8} />
-                                <Line yAxisId="left" type="monotone" dataKey="netProfit" stroke="#facc15" strokeWidth={2} dot={false} />
-                                <Line yAxisId="right" type="monotone" dataKey="margin" stroke="#fb923c" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                            </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Cost Breakdown */}
-                <div className="bg-card-bg p-4 md:p-6 rounded-xl border border-slate-700/50">
-                    <h2 className="text-base md:text-lg font-bold mb-6">Cost Breakdown</h2>
-                    <div className="flex flex-col lg:flex-row items-center justify-center gap-8 md:gap-12">
-                        <div className="relative w-48 h-48 md:w-64 md:h-64 shrink-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={stats.costBreakdown} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
-                                        {stats.costBreakdown.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
-                                    </Pie>
-                                </PieChart>
-                            </ResponsiveContainer>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-slate-400 text-xs md:text-sm font-medium">Total Costs</span>
-                                <span className="text-lg md:text-2xl font-bold text-white tracking-tight">{formatCurrency(stats.totalCosts)}</span>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 md:gap-x-12 md:gap-y-6 w-full max-w-2xl">
-                            {stats.costBreakdown.map((item) => (
-                                <div key={item.name} className="flex items-start gap-3">
-                                    <div className="w-3 h-3 md:w-4 md:h-4 rounded-md mt-1 shrink-0 shadow-sm" style={{ backgroundColor: item.color }}></div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between md:block">
-                                            <p className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider mb-0 md:mb-1">{item.name}</p>
-                                            <p className="text-white font-bold text-sm md:text-lg">{formatCurrency(item.value)}</p>
-                                        </div>
-                                        <p className="text-slate-500 text-[10px] md:text-xs text-right md:text-left">{((item.value / stats.totalCosts) * 100).toFixed(1)}%</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Ad Spend & Orders vs Spend */}
+                {/* 2. MAIN CHART SECTION */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                     <div className="lg:col-span-2 bg-card-bg p-4 md:p-6 rounded-xl border border-slate-700/50">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
-                             <h2 className="text-base md:text-lg font-bold">Ad Spend by Channel</h2>
-                             <div className="flex items-center gap-2 text-xs">
-                                 <span className="flex items-center gap-1"><div className="w-3 h-3 bg-orange-500 rounded-full"></div> Total Ad Spend</span>
+                  {/* Revenue Graph */}
+                  <motion.div variants={itemVariants} className="lg:col-span-2 bg-slate-900/40 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-xl">
+                      <div className="flex justify-between items-center mb-6">
+                        <div>
+                          <h2 className="text-lg font-bold text-white">Performance Overview</h2>
+                          <p className="text-xs text-slate-400">Revenue vs Costs vs Net Profit</p>
+                        </div>
+                        <button className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition-colors border border-slate-700">View Report</button>
+                      </div>
+                      <div className="h-[350px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <ComposedChart data={stats.graphData} margin={{ top: 10, right: 0, bottom: 0, left: -20 }}>
+                                  <defs>
+                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                  <XAxis dataKey="date" stroke="#64748b" tickLine={false} axisLine={false} dy={10} tick={{fontSize: 12}} tickFormatter={(str) => str.substring(5)} />
+                                  <YAxis yAxisId="left" stroke="#64748b" tickLine={false} axisLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `$${val/1000}k`} />
+                                  <YAxis yAxisId="right" orientation="right" stroke="#64748b" tickLine={false} axisLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `${val}%`} />
+                                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.1 }} />
+                                  <Bar yAxisId="left" dataKey="revenue" barSize={20} fill="url(#colorRevenue)" radius={[4, 4, 0, 0]} />
+                                  <Line yAxisId="left" type="monotone" dataKey="netProfit" stroke="#facc15" strokeWidth={3} dot={{r: 4, fill: '#1e293b', strokeWidth: 2}} activeDot={{r: 6}} />
+                                  <Line yAxisId="right" type="monotone" dataKey="margin" stroke="#f97316" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+                              </ComposedChart>
+                          </ResponsiveContainer>
+                      </div>
+                  </motion.div>
+
+                  {/* Profit Circle */}
+                  <motion.div variants={itemVariants} className="bg-slate-900/40 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-xl flex flex-col">
+                      <h2 className="text-lg font-bold text-white mb-2">Cost Breakdown</h2>
+                      <div className="flex-1 flex flex-col items-center justify-center relative min-h-[250px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                  <Pie 
+                                    data={stats.costBreakdown} 
+                                    cx="50%" cy="50%" 
+                                    innerRadius={70} 
+                                    outerRadius={90} 
+                                    paddingAngle={5} 
+                                    dataKey="value" 
+                                    stroke="none"
+                                  >
+                                      {stats.costBreakdown.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                                  </Pie>
+                                  <Tooltip />
+                              </PieChart>
+                          </ResponsiveContainer>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                              <span className="text-slate-400 text-xs font-medium">Total Costs</span>
+                              <span className="text-2xl font-bold text-white tracking-tight">{formatCurrency(stats.totalCosts)}</span>
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                           {stats.costBreakdown.map((item) => (
+                              <div key={item.name} className="flex items-center gap-2 text-xs">
+                                <div className="w-2 h-2 rounded-full" style={{backgroundColor: item.color}}></div>
+                                <span className="text-slate-300">{item.name}</span>
+                              </div>
+                           ))}
+                      </div>
+                  </motion.div>
+                </div>
+
+                {/* 3. LOWER GRID */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Channel Bar Chart */}
+                     <motion.div variants={itemVariants} className="lg:col-span-2 bg-slate-900/40 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-xl">
+                        <div className="flex justify-between items-center mb-6">
+                             <h2 className="text-lg font-bold">Ad Spend by Channel</h2>
+                             <div className="px-2 py-1 bg-orange-500/10 text-orange-400 text-xs font-bold rounded-md border border-orange-500/20">
+                                Live Data
                              </div>
                         </div>
-                        <div className="h-[200px] md:h-[250px] w-full">
+                        <div className="h-[220px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart layout="vertical" data={stats.channelData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
+                                <BarChart layout="vertical" data={stats.channelData} margin={{ top: 0, right: 20, left: 20, bottom: 0 }} barSize={24}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#1e293b" />
                                     <XAxis type="number" hide />
-                                    <YAxis type="category" dataKey="name" tick={<CustomYAxisTick />} width={10} axisLine={false} tickLine={false} />
-                                    <Tooltip cursor={{fill: '#334155', opacity: 0.2}} contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff', fontSize: '12px' }} formatter={(val) => formatCurrency(val)}/>
-                                    <Bar dataKey="value" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
+                                    <YAxis type="category" dataKey="name" width={100} axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 500}} />
+                                    <Tooltip cursor={{fill: '#334155', opacity: 0.2}} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff', borderRadius: '8px' }} formatter={(val) => formatCurrency(val)}/>
+                                    <Bar dataKey="value" fill="#f97316" radius={[0, 4, 4, 0]}>
+                                      {stats.channelData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.name === 'Meta' ? '#3b82f6' : entry.name === 'TikTok' ? '#ec4899' : '#f97316'} />
+                                      ))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
-                    </div>
-                    <div className="bg-card-bg p-4 md:p-6 rounded-xl border border-slate-700/50 flex flex-col justify-center">
-                        <h2 className="text-base md:text-lg font-bold mb-6">Ad Spend Summary</h2>
-                        <div className="space-y-4 md:space-y-6">
-                            <div className="flex justify-between items-center pb-3 border-b border-slate-700/50">
-                                <span className="text-slate-400 font-medium text-sm">Total Ad Spend</span>
-                                <div className="text-right"><div className="text-lg md:text-xl font-bold text-white">{formatCurrency(stats.adMetrics.totalAdSpend)}</div></div>
-                            </div>
-                            <div className="flex justify-between items-center pb-3 border-b border-slate-700/50">
-                                <div className="flex items-center gap-2"><span className="text-slate-400 font-medium text-sm">POAS</span></div>
-                                <div className="text-right"><div className="text-lg md:text-xl font-bold text-emerald-400">{stats.adMetrics.poas}</div></div>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2"><span className="text-slate-400 font-medium text-sm">Blended ROAS</span></div>
-                                <div className="text-right"><div className="text-lg md:text-xl font-bold text-blue-400">{stats.adMetrics.blendedROAS}</div></div>
-                            </div>
-                            <div className="mt-2 p-3 bg-blue-900/20 border border-blue-500/20 rounded-lg flex gap-3 items-start">
-                                <Zap className="text-blue-400 shrink-0 mt-0.5" size={16} />
-                                <p className="text-[10px] md:text-xs text-blue-200 leading-relaxed">Don't miss out on your best converting channels!</p>
-                            </div>
+                    </motion.div>
+
+                    {/* Summary List */}
+                    <motion.div variants={itemVariants} className="bg-slate-900/40 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 shadow-xl flex flex-col justify-center">
+                        <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
+                           <Zap size={18} className="text-yellow-400" /> Key Insights
+                        </h2>
+                        <div className="space-y-1">
+                            <SummaryRow label="Total Ad Spend" value={formatCurrency(stats.adMetrics.totalAdSpend)} />
+                            <SummaryRow label="POAS" value={stats.adMetrics.poas} color="text-emerald-400" />
+                            <SummaryRow label="Blended ROAS" value={stats.adMetrics.blendedROAS} color="text-blue-400" />
+                            <SummaryRow label="CAC" value={formatCurrency(stats.customerSummary.cac)} />
                         </div>
-                    </div>
+                        <motion.button 
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="mt-6 w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-medium shadow-lg shadow-blue-500/20 text-sm flex items-center justify-center gap-2 transition-all"
+                        >
+                           Detailed Analytics <ArrowUpRight size={16} />
+                        </motion.button>
+                    </motion.div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-card-bg p-4 md:p-6 rounded-xl border border-slate-700/50">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
-                            <h2 className="text-base md:text-lg font-bold">Orders vs Ad Spend</h2>
-                            <div className="flex flex-wrap gap-4 text-[10px] md:text-xs font-medium">
-                                <div className="flex items-center gap-1.5 text-slate-400"><div className="w-2 h-2 md:w-3 md:h-3 bg-slate-600 rounded-sm"></div> Orders</div>
-                                <div className="flex items-center gap-1.5 text-orange-500"><div className="w-2 h-0.5 md:w-3 md:h-0.5 bg-orange-500"></div> Ad Spend/Order</div>
-                            </div>
+                {/* 4. PROMO BANNER */}
+                <motion.div variants={itemVariants} className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 p-8 border border-white/10 shadow-2xl">
+                     <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
+                     <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl"></div>
+                     
+                     <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                        <div className="text-center md:text-left">
+                           <h3 className="text-2xl font-bold text-white mb-2">ProfitPulse Mobile</h3>
+                           <p className="text-purple-200 max-w-md">Access your real-time data anywhere. Download our new mobile app for iOS and Android.</p>
+                           <div className="flex gap-3 mt-6 justify-center md:justify-start">
+                              <button className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-lg border border-white/10 transition-colors text-sm font-medium">
+                                <Apple size={16} /> App Store
+                              </button>
+                              <button className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-lg border border-white/10 transition-colors text-sm font-medium">
+                                <Smartphone size={16} /> Play Store
+                              </button>
+                           </div>
                         </div>
-                        <div className="h-[250px] md:h-[300px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={stats.graphData} margin={{ top: 20, right: 0, bottom: 0, left: -20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis dataKey="date" stroke="#94a3b8" tickLine={false} axisLine={false} dy={10} tick={{fontSize: 12}} tickFormatter={(str) => str.substring(5)} />
-                                    <YAxis yAxisId="left" stroke="#94a3b8" tickLine={false} axisLine={false} tick={{fontSize: 12}} />
-                                    <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" tickLine={false} axisLine={false} tick={{fontSize: 12}} tickFormatter={(val) => `$${val}`} />
-                                    <Tooltip content={<OrderTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
-                                    <Bar yAxisId="left" dataKey="orders" barSize={12} md:barSize={30} fill="#475569" radius={[4, 4, 0, 0]} />
-                                    <Line yAxisId="right" type="monotone" dataKey="adSpendPerOrder" stroke="#f97316" strokeWidth={3} dot={false} />
-                                </ComposedChart>
-                            </ResponsiveContainer>
+                        <div className="bg-white p-3 rounded-2xl shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500">
+                             <QrCode size={120} className="text-slate-900" />
                         </div>
-                    </div>
-                    <div className="bg-card-bg p-4 md:p-6 rounded-xl border border-slate-700/50 flex flex-col justify-center">
-                        <h2 className="text-base md:text-lg font-bold mb-6">Order Summary</h2>
-                        <div className="space-y-1">
-                            <SummaryRow label="Avg. Order Value" value={formatCurrency(stats.orderMetrics.avgOrderValue)} />
-                            <SummaryRow label="Ad Spend Per Order" value={formatCurrency(stats.orderMetrics.adSpendPerOrder)} />
-                            <SummaryRow label="Avg. Order Profit" value={formatCurrency(stats.orderMetrics.avgOrderProfit)} color={stats.orderMetrics.avgOrderProfit >= 0 ? "text-emerald-400" : "text-red-400"} />
-                            <SummaryRow label="Avg. Order Cost" value={formatCurrency(stats.orderMetrics.avgOrderCost)} />
-                            <SummaryRow label="Purchase Frequency" value={stats.orderMetrics.purchaseFrequency} />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="bg-card-bg p-4 md:p-6 rounded-xl border border-slate-700/50">
-                        <div className="flex justify-between items-center mb-6">
-                             <h2 className="text-base md:text-lg font-bold">Customer Summary</h2>
-                             <button className="text-xs text-blue-400 hover:text-blue-300">View report</button>
-                        </div>
-                        <div className="space-y-1">
-                            <SummaryRow label="Total Customers" value={stats.customerSummary.totalCustomers} />
-                            <SummaryRow label="New Customers" value={stats.customerSummary.newCustomers} />
-                            <SummaryRow label="Repurchase Rate" value={`${stats.customerSummary.repurchaseRate}%`} />
-                            <SummaryRow label="CAC" value={formatCurrency(stats.customerSummary.cac)} color="text-emerald-400" />
-                        </div>
-                    </div>
-
-                    <div className="bg-card-bg p-4 md:p-6 rounded-xl border border-slate-700/50">
-                        <h2 className="text-base md:text-lg font-bold mb-6">Others</h2>
-                        <div className="space-y-1">
-                            <SummaryRow label="Shipping Charged" value={formatCurrency(stats.others.shippingCharged)} />
-                            <SummaryRow label="Taxes Collected" value={formatCurrency(stats.others.taxesCollected)} />
-                            <SummaryRow label="Tips" value={formatCurrency(stats.others.tips)} />
-                            <SummaryRow label="Gift Card Sales" value={formatCurrency(stats.others.giftCardSales)} />
-                            <SummaryRow label="Returns" value={formatCurrency(stats.others.returns)} />
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-900 p-6 md:p-8 rounded-xl border border-slate-700/50 flex flex-col items-center text-center justify-center relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
-                        <p className="text-xs md:text-sm font-medium text-slate-300 mb-6">Scan to install the ProfitPulse mobile app for real-time insights on the go.</p>
-                        <div className="bg-white p-2 rounded-xl mb-6 shadow-lg shadow-white/5">
-                            <QrCode size={100} className="text-slate-900 md:w-[120px] md:h-[120px]" />
-                        </div>
-                        <div className="flex gap-2 w-full">
-                            <button className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 py-2 rounded-lg border border-slate-700 transition-colors text-[10px] md:text-xs font-medium"><Smartphone size={14} /> Android</button>
-                            <button className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 py-2 rounded-lg border border-slate-700 transition-colors text-[10px] md:text-xs font-medium"><Apple size={14} /> iOS</button>
-                        </div>
-                    </div>
-                </div>
-            </>
+                     </div>
+                </motion.div>
+            </motion.div>
+        ) : (
+            // Loading Skeleton
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-pulse">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="h-32 bg-slate-800/50 rounded-2xl border border-slate-800"></div>
+                ))}
+            </div>
         )}
       </main>
     </div>
